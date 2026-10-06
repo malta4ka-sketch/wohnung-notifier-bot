@@ -114,7 +114,7 @@ class DatabaseManager:
             price_cold TEXT NOT NULL,
             price_total TEXT NOT NULL,
             rooms TEXT NOT NULL,
-            wbs INTEGER NOT NULL DEFAULT 0,
+            wbs INTEGER DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -168,7 +168,7 @@ class DatabaseManager:
                     price_cold TEXT NOT NULL,
                     price_total TEXT NOT NULL,
                     rooms TEXT NOT NULL,
-                    wbs INTEGER NOT NULL DEFAULT 0,
+                   wbs INTEGER DEFAULT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
