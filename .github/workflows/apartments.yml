@@ -1,0 +1,66 @@
+name: Apartment notifier
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+jobs:
+  check-apartments:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create settings.json
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          config = {
+              "telegram": {
+                  "bot_token": os.environ["TELEGRAM_BOT_TOKEN"],
+                  "chat_id": os.environ["TELEGRAM_CHAT_ID"]
+              },
+              "scraper": {
+                  "poll_interval_seconds": 120,
+                  "suspension_start_hour": 0,
+                  "suspension_end_hour": 0
+              },
+              "scrapers": {
+                  "inberlinwohnen": {"enabled": True},
+                  "immobilienscout": {"enabled": True},
+                  "immowelt": {"enabled": True},
+                  "kleinanzeigen": {"enabled": True},
+                  "ohnemakler": {"enabled": True},
+                  "deutschewohnen": {"enabled": True},
+                  "vonovia": {"enabled": True},
+                  "berlinovo": {"enabled": True},
+                  "sparkasse": {"enabled": True}
+              },
+              "appliers": {},
+              "filters": {
+                  "enabled": False,
+                  "properties": {}
+              }
+          }
+
+          with open("settings.json", "w") as f:
+              json.dump(config, f)
+          PY
+
+      - name: Check apartments
+        run: python main.py --cron
