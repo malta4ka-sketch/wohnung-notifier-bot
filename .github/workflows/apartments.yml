@@ -21,6 +21,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Restore listings database
+        uses: actions/cache@v4
+        with:
+          path: listings.db
+          key: listings-db-${{ github.run_id }}
+          restore-keys: |
+            listings-db-
+
       - name: Create settings.json
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -53,22 +61,24 @@ jobs:
               },
               "appliers": {},
               "filters": {
-                  "enabled": False,
-                  "properties": {}
+                  "enabled": True,
+                  "properties": {
+                      "price_total": {
+                          "min": None,
+                          "max": 600
+                      },
+                      "rooms": {
+                          "min": 1,
+                          "max": 2
+                      }
+                  }
               }
           }
 
           with open("settings.json", "w") as f:
               json.dump(config, f)
-          PY
 
-      - name: Restore listings database
-        uses: actions/cache@v4
-        with:
-          path: listings.db
-          key: apartment-listings-${{ github.run_id }}
-          restore-keys: |
-            apartment-listings-
+          PY
 
       - name: Check apartments
         run: python main.py --cron
