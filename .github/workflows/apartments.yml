@@ -62,5 +62,13 @@ jobs:
               json.dump(config, f)
           PY
 
+      - name: Restore listings database
+        uses: actions/cache@v4
+        with:
+          path: listings.db
+          key: apartment-listings-${{ github.run_id }}
+          restore-keys: |
+            apartment-listings-
+
       - name: Check apartments
         run: python main.py --cron
