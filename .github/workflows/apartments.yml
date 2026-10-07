@@ -70,6 +70,12 @@ jobs:
                       "rooms": {
                           "min": 1,
                           "max": 2
+                      },
+                      "wbs": {
+                          "has_wbs": True
+                      },
+                      "boroughs": {
+                          "allowed_values": []
                       }
                   }
               }
