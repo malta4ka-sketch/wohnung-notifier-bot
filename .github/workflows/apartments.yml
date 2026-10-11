@@ -65,11 +65,11 @@ jobs:
                   "properties": {
                       "price_total": {
                           "min": None,
-                          "max": 2000
+                          "max": 600
                       },
                       "rooms": {
                           "min": 1,
-                          "max": 4
+                          "max": 2
                       },
                       "wbs": {
                           "has_wbs": True
@@ -83,47 +83,6 @@ jobs:
 
           with open("settings.json", "w") as f:
               json.dump(config, f)
-
-          PY
-
-      - name: Test Telegram for all recipients
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python - <<'PY'
-          import os
-          import requests
-
-          token = os.environ["TELEGRAM_BOT_TOKEN"]
-
-          chat_ids = [
-              chat_id.strip()
-              for chat_id in os.environ["TELEGRAM_CHAT_ID"].split(",")
-              if chat_id.strip()
-          ]
-
-          print(f"Testing Telegram for {len(chat_ids)} recipient(s)")
-
-          for chat_id in chat_ids:
-              response = requests.post(
-                  f"https://api.telegram.org/bot{token}/sendMessage",
-                  data={
-                      "chat_id": chat_id,
-                      "text": "🏠 TEST: уведомления о квартирах работают!"
-                  },
-                  timeout=30
-              )
-
-              print(
-                  f"Chat ...{chat_id[-4:]}: "
-                  f"status={response.status_code}"
-              )
-
-              if not response.ok:
-                  print(response.text)
-
-              response.raise_for_status()
 
           PY
 
