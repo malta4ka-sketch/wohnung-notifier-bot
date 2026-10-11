@@ -69,7 +69,7 @@ jobs:
                       },
                       "rooms": {
                           "min": 1,
-                          "max": 2
+                          "max": 4
                       },
                       "wbs": {
                           "has_wbs": True
