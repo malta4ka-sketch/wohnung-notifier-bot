@@ -1,6 +1,7 @@
 """
 This module handles sending notifications via Telegram.
 """
+
 import logging
 import time
 import urllib.parse
@@ -20,19 +21,13 @@ MAX_RETRIES = 3
 def escape_markdown_v2(text: Union[str, int, float]) -> str:
     """
     Escapes characters in a string to be compatible with Telegram's MarkdownV2 format.
-
-    In MarkdownV2, the following characters must be escaped:
-    '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'
-
-    Args:
-        text: The string or number to escape.
-
-    Returns:
-        The escaped string.
     """
     text = str(text)
     escape_chars = r'_*[]()~`>#+-=|{}.!'
-    return ''.join(f'\\{char}' if char in escape_chars else char for char in text)
+    return ''.join(
+        f'\\{char}' if char in escape_chars else char
+        for char in text
+    )
 
 
 class TelegramNotifier:
@@ -40,24 +35,49 @@ class TelegramNotifier:
 
     def __init__(self, telegram_config: Dict[str, Any]) -> None:
         """
-        Initialize the TelegramNotifier with configuration.
+        Initialize the TelegramNotifier.
 
-        Args:
-            telegram_config: Dictionary containing 'bot_token' and 'chat_id'.
+        chat_id can contain one ID or multiple IDs separated by commas.
+
+        Examples:
+            "123456789"
+            "123456789,987654321"
         """
         self.bot_token = telegram_config['bot_token']
-        self.chat_id = telegram_config['chat_id']
-        self.url = TELEGRAM_API_URL_TEMPLATE.format(token=self.bot_token)
+
+        raw_chat_ids = str(telegram_config['chat_id'])
+
+        self.chat_ids = [
+            chat_id.strip()
+            for chat_id in raw_chat_ids.split(',')
+            if chat_id.strip()
+        ]
+
+        if not self.chat_ids:
+            raise ValueError("No Telegram chat IDs configured")
+
+        self.url = TELEGRAM_API_URL_TEMPLATE.format(
+            token=self.bot_token
+        )
+
+        logger.info(
+            "Telegram notifier configured for %s recipient(s)",
+            len(self.chat_ids)
+        )
 
     def send_message(self, message: str) -> None:
         """
-        Sends a message to the configured Telegram chat with retry logic for rate limiting.
+        Sends the message to every configured Telegram chat.
+        """
+        for chat_id in self.chat_ids:
+            self._send_to_chat(chat_id, message)
 
-        Args:
-            message: The message text to send.
+    def _send_to_chat(self, chat_id: str, message: str) -> None:
+        """
+        Sends a message to one Telegram chat with retry logic.
         """
         payload = {
-            "chat_id": self.chat_id,
+            "chat_id": chat_id,
             "text": message,
             "parse_mode": "MarkdownV2",
             "disable_web_page_preview": True
@@ -65,62 +85,95 @@ class TelegramNotifier:
 
         for attempt in range(MAX_RETRIES):
             try:
-                response = requests.post(self.url, data=payload, timeout=REQUEST_TIMEOUT_SECONDS)
+                response = requests.post(
+                    self.url,
+                    data=payload,
+                    timeout=REQUEST_TIMEOUT_SECONDS
+                )
+
                 response.raise_for_status()
-                logger.info(f"Telegram response: {response.json().get('ok', False)}")
-                return  # Success, exit the retry loop
+
+                logger.info(
+                    "Telegram response for chat %s: %s",
+                    chat_id,
+                    response.json().get('ok', False)
+                )
+
+                return
+
             except requests.exceptions.HTTPError as http_err:
                 if response.status_code == 429:
-                    # Rate limited - extract retry_after and wait
                     try:
-                        retry_after = response.json().get('parameters', {}).get('retry_after', 30)
+                        retry_after = (
+                            response.json()
+                            .get('parameters', {})
+                            .get('retry_after', 30)
+                        )
                     except (ValueError, KeyError):
-                        retry_after = 30  # Default wait time if parsing fails
+                        retry_after = 30
 
                     if attempt < MAX_RETRIES - 1:
                         logger.warning(
-                            f"{Colors.YELLOW}Rate limited by Telegram. "
-                            f"Waiting {retry_after} seconds before retry {attempt + 2}/{MAX_RETRIES}...{Colors.RESET}"
+                            f"{Colors.YELLOW}"
+                            f"Rate limited by Telegram for chat {chat_id}. "
+                            f"Waiting {retry_after} seconds before retry "
+                            f"{attempt + 2}/{MAX_RETRIES}..."
+                            f"{Colors.RESET}"
                         )
+
                         time.sleep(retry_after)
                         continue
-                    else:
-                        logger.error(
-                            f"{Colors.RED}Rate limited by Telegram. "
-                            f"Max retries ({MAX_RETRIES}) exceeded.{Colors.RESET}"
-                        )
-                else:
-                    logger.exception(
-                        f"{Colors.RED}Telegram API Error: {http_err} - {response.text}{Colors.RESET}"
+
+                    logger.error(
+                        f"{Colors.RED}"
+                        f"Rate limited by Telegram for chat {chat_id}. "
+                        f"Max retries ({MAX_RETRIES}) exceeded."
+                        f"{Colors.RESET}"
                     )
-                    return  # Non-retryable error, exit
+
+                else:
+                    logger.error(
+                        f"{Colors.RED}"
+                        f"Telegram API Error for chat {chat_id}: "
+                        f"{http_err} - {response.text}"
+                        f"{Colors.RESET}"
+                    )
+
+                return
+
             except Exception:
-                logger.exception(f"{Colors.RED}Error sending Telegram message{Colors.RESET}")
-                return  # Non-retryable error, exit
+                logger.exception(
+                    f"{Colors.RED}"
+                    f"Error sending Telegram message "
+                    f"to chat {chat_id}"
+                    f"{Colors.RESET}"
+                )
+                return
 
     def format_listing_message(self, listing: Listing) -> str:
         """
-        Formats the details of a listing into a message string.
-
-        Args:
-            listing: The listing object to format.
-
-        Returns:
-            A formatted string suitable for Telegram MarkdownV2.
+        Formats the details of a listing into a Telegram message.
         """
         if listing.url != 'N/A':
-            # Format the link using MarkdownV2 syntax to make it clickable
             escaped_link = escape_markdown_v2(listing.identifier)
             details_link = f"{escaped_link}"
         else:
-            details_link = f"Link not found, ID: {escape_markdown_v2(listing.identifier)}"
+            details_link = (
+                f"Link not found, ID: "
+                f"{escape_markdown_v2(listing.identifier)}"
+            )
 
         google_maps_url = (
             "https://www.google.com/maps/search/?api=1&query="
             + urllib.parse.quote(listing.address)
         )
+
         escaped_maps_url = escape_markdown_v2(google_maps_url)
-        address_line = f"[{escape_markdown_v2(listing.address)}]({escaped_maps_url})"
+
+        address_line = (
+            f"[{escape_markdown_v2(listing.address)}]"
+            f"({escaped_maps_url})"
+        )
 
         return (
             f"🏠 *New Listing*\n\n"
