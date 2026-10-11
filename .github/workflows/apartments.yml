@@ -65,7 +65,7 @@ jobs:
                   "properties": {
                       "price_total": {
                           "min": None,
-                          "max": 600
+                          "max": 2000
                       },
                       "rooms": {
                           "min": 1,
